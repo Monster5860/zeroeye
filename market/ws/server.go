@@ -27,12 +27,12 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn
-	send     chan []byte
-	subs     map[types.Symbol]struct{}
-	remote   string
-	mu       sync.Mutex
+	hub    *Hub
+	conn   *websocket.Conn
+	send   chan []byte
+	subs   map[types.Symbol]struct{}
+	remote string
+	mu     sync.Mutex
 }
 
 type Hub struct {

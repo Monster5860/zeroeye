@@ -120,9 +120,9 @@ func (e *MatchingEngine) ValidateOrder(order *types.Order) error {
 }
 
 var (
-	ErrSymbolNotFound  = &EngineError{"symbol not found"}
-	ErrInvalidQuantity = &EngineError{"invalid quantity"}
-	ErrInvalidPrice    = &EngineError{"invalid price"}
+	ErrSymbolNotFound   = &EngineError{"symbol not found"}
+	ErrInvalidQuantity  = &EngineError{"invalid quantity"}
+	ErrInvalidPrice     = &EngineError{"invalid price"}
 	ErrShortingDisabled = &EngineError{"shorting disabled"}
 )
 
