@@ -78,6 +78,14 @@ func (e *MatchingEngine) CancelOrder(symbol types.Symbol, orderID string) error 
 	return book.CancelOrder(orderID)
 }
 
+func (e *MatchingEngine) Books() map[types.Symbol]*orderbook.OrderBook {
+	result := make(map[types.Symbol]*orderbook.OrderBook, len(e.books))
+	for symbol, book := range e.books {
+		result[symbol] = book
+	}
+	return result
+}
+
 func (e *MatchingEngine) GetTradeCount() int64 {
 	return e.tradeCount.Load()
 }
