@@ -79,11 +79,18 @@ sudo apt install -y build-essential curl ca-certificates gnupg pkg-config libssl
 ## Build
 
 ```sh
-python3 build.py              # Build all modules
-python3 build.py --clean      # Clean all artifacts
-python3 build.py --module backend,frontend  # Build specific modules
-python3 build.py --release    # Release mode (Rust only)
+python3 build.py                         # Build all modules
+python3 build.py build --module backend  # Build one module
+python3 build.py build -m backend,frontend  # Build specific modules
+python3 build.py clean --module frontend # Clean one module
+python3 build.py list                    # List available modules
+python3 build.py doctor                  # Check required toolchains and diagnostics
+python3 build.py build --dry-run         # Preview selected build commands
+python3 build.py --release               # Release mode (Rust only)
 ```
+
+The legacy flags still work, so `python3 build.py --clean` and
+`python3 build.py --module backend,frontend` remain valid.
 
 ### Build diagnostics
 

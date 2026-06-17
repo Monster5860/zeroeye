@@ -775,22 +775,77 @@ def print_summary(results: list[tuple[str, bool, float, str, Optional[str]]]):
           f"{color(str(failed) + ' failed', Colors.RED)}, "
           f"{total_time:.1f}s total")
 
+def print_modules() -> None:
+    print(f"  {color('Available modules:', Colors.BOLD)}")
+    for module in MODULES:
+        print(f"    {color(module.name, Colors.CYAN)} ({module.language})")
+        print(f"      dir: {module.dir.relative_to(ROOT)}")
+        print(f"      build: {' '.join(module.build_cmd)}")
+
+
+def select_modules(module_arg: str) -> Optional[list[Module]]:
+    if module_arg == "all":
+        return MODULES
+
+    names = [name.strip() for name in module_arg.split(",") if name.strip()]
+    selected = [module for module in MODULES if module.name in names]
+    not_found = set(names) - {module.name for module in MODULES}
+    if not_found:
+        print(f"  {color('✗ Unknown modules:', Colors.RED)} {', '.join(sorted(not_found))}")
+        print(f"    Available: {', '.join(module.name for module in MODULES)}")
+        return None
+
+    return selected
+
+
+def print_prerequisite_report(check_encryptly: bool = True) -> int:
+    print(f"  {color('Checking prerequisites...', Colors.GRAY)}")
+    missing = check_prerequisites()
+    if missing:
+        print(f"\n  {color('⚠ Missing tools:', Colors.YELLOW)}")
+        for item in missing:
+            print(f"    {item}")
+    else:
+        print(f"  {color('✓ All prerequisites found', Colors.GREEN)}")
+
+    if check_encryptly:
+        print(f"\n  {color('Checking encryptly diagnostics...', Colors.GRAY)}")
+        encryptly_ok, encryptly_message = check_encryptly_runs()
+        if encryptly_ok:
+            print(f"  {color('✓ encryptly runs', Colors.GREEN)}")
+        else:
+            print(f"  {color('✗ encryptly cannot run', Colors.RED)}")
+            print(f"  {color('BLOCKER:', Colors.RED)} {ENCRYPTLY_BLOCKER_MESSAGE} {encryptly_message}")
+            return 1
+
+    return 1 if missing else 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Tent of Trials  -  Multi-Language Build System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 build.py                    Build all modules
-  python3 build.py -m backend         Build only backend
-  python3 build.py -m frontend,market Build frontend and market
-  python3 build.py --clean            Clean all artifacts
-  python3 build.py --release          Release build (Rust only)
-  python3 build.py --verbose          Verbose output
+  python3 build.py                         Build all modules
+  python3 build.py build -m backend        Build only backend
+  python3 build.py -m frontend,market      Build frontend and market (legacy form)
+  python3 build.py clean -m frontend       Clean frontend artifacts
+  python3 build.py list                    List available modules
+  python3 build.py doctor                  Check toolchain and diagnostics
+  python3 build.py --release               Release build (Rust only)
+  python3 build.py --verbose               Verbose output
 
 Diagnostic bundle:
   python3 build.py
         """,
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=("build", "clean", "list", "doctor"),
+        default="build",
+        help="CLI command to run (default: build)",
     )
     parser.add_argument(
         "-m", "--module",
@@ -811,50 +866,61 @@ Diagnostic bundle:
     )
     parser.add_argument(
         "--list", action="store_true",
-        help="List available modules and exit",
+        help="List available modules and exit (legacy alias for 'list')",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Print the selected modules and commands without building or cleaning",
+    )
+    parser.add_argument(
+        "--skip-encryptly-check", action="store_true",
+        help="Skip encryptly preflight in the 'doctor' command only",
     )
 
     args = parser.parse_args()
+    if args.list:
+        args.command = "list"
+    if args.clean:
+        args.command = "clean"
 
-    print(f"\n  {color('Tent of Trials: building', Colors.CYAN)}")
+    print(f"\n  {color(f'Tent of Trials: {args.command}', Colors.CYAN)}")
     print(f"  Working directory: {ROOT}")
     print()
 
-    if args.list:
-        print(f"  {color('Available modules:', Colors.BOLD)}")
-        for m in MODULES:
-            print(f"    {color(m.name, Colors.CYAN)} ({m.language})")
-            print(f"      dir: {m.dir.relative_to(ROOT)}")
-            print(f"      build: {' '.join(m.build_cmd)}")
+    if args.command == "list":
+        print_modules()
         return 0
+
+    if args.command == "doctor":
+        return print_prerequisite_report(check_encryptly=not args.skip_encryptly_check)
 
     print(f"  {color('Checking prerequisites...', Colors.GRAY)}")
     missing = check_prerequisites()
     if missing:
         print(f"\n  {color('⚠ Some tools missing  -  will try anyway:', Colors.YELLOW)}")
-        for m in missing:
-            print(f"    {m}")
+        for item in missing:
+            print(f"    {item}")
 
-        msg = "Not all modules will build. That's fine."
-        print(f"  {color(msg, Colors.GRAY)}")
+        print(f"  {color('Not all modules will build. That is acceptable for partial builds.', Colors.GRAY)}")
     else:
         print(f"  {color('✓ All prerequisites found', Colors.GREEN)}")
-    if args.module == "all":
-        selected = MODULES
-    else:
-        names = [n.strip() for n in args.module.split(",")]
-        selected = [m for m in MODULES if m.name in names]
-        not_found = set(names) - {m.name for m in MODULES}
-        if not_found:
-            print(f"  {color('✗ Unknown modules:', Colors.RED)} {', '.join(not_found)}")
-            print(f"    Available: {', '.join(m.name for m in MODULES)}")
-            return 1
+
+    selected = select_modules(args.module)
+    if selected is None:
+        return 1
 
     if not selected:
         print(f"  No modules selected.")
         return 0
 
-    if args.clean:
+    if args.dry_run:
+        print(f"\n  {color('Dry run plan:', Colors.BOLD)}")
+        for module in selected:
+            cmd = module.clean_cmd if args.command == "clean" else module.build_cmd
+            print(f"    {module.name}: (cd {module.dir.relative_to(ROOT)} && {' '.join(cmd)})")
+        return 0
+
+    if args.command == "clean":
         print(f"\n  {color('Cleaning build artifacts...', Colors.YELLOW)}")
         for module in selected:
             clean_module(module, args.verbose)
