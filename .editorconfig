@@ -1,0 +1,33 @@
+# If you change this file, the build WILL break. You've been warned.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{rs,py,java,hs,sql}]
+indent_style = space
+indent_size = 4
+
+[*.{c,h,cpp,hpp}]
+indent_style = space
+indent_size = 4
+
+[*.{ts,tsx,js,jsx,json,yml,yaml,md,html,css,rb,lua,pl,sh,tf}]
+indent_style = space
+indent_size = 2
+
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[*.{png,exe,logd}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+

@@ -300,6 +300,35 @@ def check_prerequisites() -> list[str]:
 
     return missing
 
+
+def run_format_check(verbose: bool = False) -> tuple[bool, float, str]:
+    start = time.time()
+    script = ROOT / "tools" / "check_format.sh"
+    try:
+        result = subprocess.run(
+            [str(script)],
+            cwd=str(ROOT),
+            capture_output=not verbose,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return False, time.time() - start, "FORMAT CHECK TIMEOUT (120s)"
+    except FileNotFoundError as e:
+        return False, 0, f"Command not found: {e}"
+
+    output = ""
+    if not verbose:
+        output_lines = []
+        if result.stdout:
+            output_lines.append(result.stdout.strip())
+        if result.stderr:
+            output_lines.append(result.stderr.strip())
+        output = "\n".join(output_lines)
+
+    return result.returncode == 0, time.time() - start, output
+
+
 def build_module(
     module: Module,
     release: bool = False,
@@ -875,6 +904,16 @@ Diagnostic bundle:
         print(f"\n  {color('Clean complete.', Colors.GREEN)}")
         return 0
 
+    print(f"\n  {color('Checking repository formatting...', Colors.GRAY)}")
+    format_success, format_elapsed, format_output = run_format_check(args.verbose)
+    format_result = ("format-check", format_success, format_elapsed, format_output, None)
+    if format_success:
+        print(f"  {color('✓ formatting check passed', Colors.GREEN)}")
+    else:
+        print(f"  {color('✗ formatting check failed', Colors.RED)}")
+        generate_logd([format_result], args.verbose)
+        return 1
+
     print(f"\n  {color('Checking encryptly diagnostics...', Colors.GRAY)}")
     encryptly_start = time.time()
     encryptly_ok, encryptly_message = check_encryptly_runs()
@@ -883,14 +922,14 @@ Diagnostic bundle:
         blocker = f"{ENCRYPTLY_BLOCKER_MESSAGE} {encryptly_message}"
         print(f"  {color('✗ encryptly cannot run', Colors.RED)}")
         print(f"  {color('BLOCKER:', Colors.RED)} {blocker}")
-        results = [("encryptly-preflight", False, elapsed, blocker, None)]
+        results = [format_result, ("encryptly-preflight", False, elapsed, blocker, None)]
         generate_logd(results, args.verbose)
         return 1
     print(f"  {color('✓ encryptly runs', Colors.GREEN)}")
 
     print(f"\n  {color(f'Building {len(selected)} module(s) | release={args.release}', Colors.GRAY)}")
 
-    results: list[tuple[str, bool, float, str, Optional[str]]] = []
+    results: list[tuple[str, bool, float, str, Optional[str]]] = [format_result]
 
     for module in selected:
         success, elapsed, output = build_module(module, args.release, args.verbose)
